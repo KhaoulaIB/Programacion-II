@@ -11,6 +11,7 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.awt.image.ImagingOpException;
 import java.io.*;
+import java.util.Arrays;
 import java.util.Random;
 
 public class SubImagen extends  JPanel {
@@ -35,6 +36,13 @@ public class SubImagen extends  JPanel {
         return columnas;
     }
 
+    public static boolean DirectoriNoBuit = true;
+
+    public static void SetDirectoriNoBuit(boolean valor){
+        DirectoriNoBuit = valor;
+    }
+
+
     private static BufferedImage[] imgs;
 
     private static BufferedImage []imagenesPuzzleInicial;
@@ -50,7 +58,7 @@ public class SubImagen extends  JPanel {
     /*
      *Metode que selecciona alteatoriement una imatge d'un direcotiri que es passa per parametre
      */
-    private BufferedImage ImagenAleatoria(String directorio) {
+    private String ImagenAleatoria(String directorio) {
         String RutaImagen = "";
         File folder = new File(directorio);
 
@@ -63,18 +71,18 @@ public class SubImagen extends  JPanel {
                 File randomFile = files[randomIndex];
                 RutaImagen += randomFile;
             } else {
-                System.out.println("El directorio está vacío.");//clase terminal
+                Joc.ventanaInformativa("El directorio está vacío.");//clase terminal
+                DirectoriNoBuit = false;
+
             }
         } else {
-            System.out.println("El directorio no existe o no es válido.");
+           Joc.ventanaInformativa("El directorio no existe o no es válido.");
+            DirectoriNoBuit = false;
+
         }
 
-        try {
-            return ImageIO.read(new File(RutaImagen));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
 
+    return RutaImagen;
 
     }
 
@@ -83,10 +91,11 @@ public class SubImagen extends  JPanel {
     *Mostra pel panel de PanelVisualisations la iamtge subdividida i reordenada del puzzle
     *
      */
-    public void ImagePartida(String directorio, JPanel PanelVisualisations, JProgressBar pbar) throws IOException {
+    public void ImagePartida(String directorio, JPanel PanelVisualisations, JProgressBar pbar) throws IOException { // nomes funcionara quan la imatge no és nula
          try {
-             image = ImagenAleatoria(directorio);
-             if (image != null) {
+             String RutaImatge = ImagenAleatoria(directorio);
+             if (RutaImatge!=null){
+                 image=ImageIO.read(new File(RutaImatge));
                  Image imageescalada = image.getScaledInstance(1002, 667, Image.SCALE_DEFAULT);
                  BufferedImage imagenfinal = new BufferedImage(imageescalada.getWidth(null), imageescalada.getHeight(null), BufferedImage.TYPE_INT_ARGB);
                  SetImatge(imagenfinal);
@@ -95,13 +104,11 @@ public class SubImagen extends  JPanel {
                  graphics.dispose();
                  imgs = subdividirImagen(image);
                  crearPanelPartida(GetFilas(), GetColumnas(), PanelVisualisations, pbar);
-             }else{
-                 image = ImagenAleatoria(directorio);
              }
          } catch(NullPointerException | ImagingOpException ex){
             System.out.println(ex.getMessage());
 
-        }
+       }
     }
 
 
@@ -149,7 +156,7 @@ public class SubImagen extends  JPanel {
                 current_img++;
             }
         }
-        imagenesPuzzleInicial = imgs.clone();
+       // imagenesPuzzleInicial = imgs.clone();
 
         setImgs(imgs.clone()); // imgs incials sense canviar l'ordre dels subimatges
         return imgs;
@@ -180,60 +187,41 @@ public class SubImagen extends  JPanel {
         int n = imgs.length;
         Random random = new Random();
 
-        for (int i = 0; i < n - 1; i++) {
-            int j = i + random.nextInt(n - i);
+        for (int i = n - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
             BufferedImage temp = imgs[j];
             imgs[j] = imgs[i];
             imgs[i] = temp;
         }
+        //for (int i = 0; i<imgs)
         SetpuzzleJugador(imgs);
     }
 
-    private JLabel selectedLabel = null;
+
+
+
+
 
     /*
     +Metode que col·loca les subimatges en el panell de la partida i gestiona el moviment d'aquestes subimatges
      */
-    private void crearPanelPartida(int filas, int columnas, JPanel PanelVisualisations, JProgressBar barporg) {
-        panellPartida = new JPanel(new GridLayout(filas, columnas, 1, 1)); // Uso de GridLayout personalizado
-        JLabel[] labels = new JLabel[filas * columnas];
-        boolean[] l1Clicked = new boolean[filas * columnas];
-         currentImgs = new BufferedImage[filas * columnas];
+
+    JLabel[] labels;
+   private void crearPanelPartida(int filas, int columnas, JPanel PanelVisualisations, JProgressBar barporg) {
+        panellPartida = new JPanel(new GridLayout(filas, columnas, 2, 2));
+         labels = new JLabel[filas * columnas];
+        currentImgs = new BufferedImage[filas * columnas];
 
         reordenarSubiamges();
         for (int i = 0; i < filas * columnas; i++) {
             labels[i] = new JLabel(new ImageIcon(imgs[i]));
+            labels[i].setName(String.valueOf(i)); // assignar a cada label un index
+           // labels[i].setName(Integer.toString(i)); // Establecer el nombre con el índice
             labels[i].setPreferredSize(new Dimension(imgs[0].getWidth(), imgs[0].getWidth()));
-            l1Clicked[i] = false;
             currentImgs[i] = imgs[i];
 
-            labels[i].addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    super.mouseClicked(e);
+            labels[i].addMouseListener(createMouseListener());
 
-                    JLabel targetLabel = (JLabel) e.getSource();
-
-                    if (selectedLabel == null) {
-                        selectedLabel = targetLabel;
-                        selectedLabel.setBorder(BorderFactory.createLineBorder(Color.RED, 3));
-                    } else {
-                        JLabel finalSelectedLabel = selectedLabel;
-                        selectedLabel.setBorder(BorderFactory.createEmptyBorder());
-
-                        BufferedImage selectedImg = currentImgs[panellPartida.getComponentZOrder(finalSelectedLabel)];
-                        BufferedImage targetImg = currentImgs[panellPartida.getComponentZOrder(targetLabel)];
-
-                        currentImgs[panellPartida.getComponentZOrder(finalSelectedLabel)] = targetImg;
-                        currentImgs[panellPartida.getComponentZOrder(targetLabel)] = selectedImg;
-
-                        finalSelectedLabel.setIcon(new ImageIcon(targetImg));
-                        targetLabel.setIcon(new ImageIcon(selectedImg));
-
-                        selectedLabel = null; // reiniciar selectedLabel
-                    }
-                }
-            });
             panellPartida.add(labels[i]);
             SetpuzzleJugador(currentImgs);
         }
@@ -246,19 +234,69 @@ public class SubImagen extends  JPanel {
     }
 
 
+    JLabel selectedLabel=null;
+
+
+
+    private MouseAdapter createMouseListener() {
+        return new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                super.mouseClicked(e);
+
+                JLabel targetLabel = ((JLabel) e.getComponent());
+
+                if (selectedLabel == null) {
+                    selectedLabel = targetLabel;
+                    PintarVorera(selectedLabel, true);
+                return;}
+
+                int selectedIndex = Integer.parseInt(selectedLabel.getName());
+                int targetIndex = Integer.parseInt(targetLabel.getName());
+
+                //actualitzem les subimatges
+                BufferedImage selectedImg = currentImgs[selectedIndex];
+                currentImgs[selectedIndex] = currentImgs[targetIndex];
+                currentImgs[targetIndex] = selectedImg;
+
+                    Icon temp = selectedLabel.getIcon();
+                    selectedLabel.setIcon(targetLabel.getIcon());
+                    targetLabel.setIcon(temp);
+
+                PintarVorera(selectedLabel, false);
+                    selectedLabel = null;
+
+            }
+        };
+    }
+
+
+
+
+
+
+
+    public void PintarVorera(JLabel label, boolean pintar){
+          if (pintar) {
+              label.setBorder(BorderFactory.createLineBorder(Color.RED, 3));
+          }else{
+              label.setBorder(BorderFactory.createEmptyBorder());
+          }
+
+    }
     /*
-    *Verifica si el jugador ha guanyat, es a dir, ha pogut solucion el puzzle
+     *Verifica si el jugador ha solucionat el puzle
      */
     public static boolean EstaSolucionada() {
         for (int i = 0; i < columnas * filas; i++) {
             if (!GetpuzzleJugador()[i].equals(GetImgs()[i])) {
-
                 return false;
             }
         }
 
         return true;
     }
+
 
 
 
